@@ -25,14 +25,17 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
             java_script_enabled=True,
         )
         page = context.new_page()
-        page.set_default_timeout(10000)
+        page.set_default_timeout(15000)
 
-        # Block images, fonts, media, and stylesheets to make page load ultra fast (2s)
-        page.route("**/*.{png,jpg,jpeg,webp,gif,svg,css,woff,woff2,ttf,otf}", lambda route: route.abort())
+        # Block heavy images and web fonts only (keep CSS so layout selectors work)
+        page.route("**/*.{png,jpg,jpeg,webp,gif,svg,woff,woff2,ttf,otf}", lambda route: route.abort())
 
         try:
-            page.goto(url, wait_until="domcontentloaded", timeout=12000)
-            page.wait_for_selector('div[data-component-type="s-search-result"]', timeout=6000)
+            page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            try:
+                page.wait_for_selector('div[data-component-type="s-search-result"]', timeout=8000)
+            except:
+                pass
 
             product_cards = page.query_selector_all('div[data-component-type="s-search-result"]')
 
