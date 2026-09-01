@@ -63,6 +63,13 @@ app.add_middleware(
 # In-memory cache: max 100 queries, TTL of 3 hours (10800 seconds)
 search_cache = TTLCache(maxsize=100, ttl=10800)
 
+@app.get("/")
+def read_root():
+    return {
+        "message": "Welcome to the DealHunter Product Comparison API with MongoDB Atlas Price Tracking",
+        "endpoints": ["/api/search", "/api/product/history", "/api/alerts"]
+    }
+
 @app.get("/api/test-scrape")
 async def test_scrape(site: str = "amazon", q: str = "paint color"):
     import traceback
