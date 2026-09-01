@@ -161,16 +161,13 @@ async def search_products(q: str):
             if is_accessory:
                 return "related"
             return "exact"
-        elif len(matched) >= 1:
-            return "related"
-        return "skip"
+        # Put partial matches or general search results into related instead of discarding them
+        return "related"
 
     categorized = []
     for p in all_products:
-        cat = categorize(p)
-        if cat != "skip":
-            p.match_type = cat
-            categorized.append(p)
+        p.match_type = categorize(p)
+        categorized.append(p)
 
     # Sort each group by price (put ₹0 at end)
     categorized.sort(key=lambda p: (p.match_type == "related", p.price == 0, p.price))
