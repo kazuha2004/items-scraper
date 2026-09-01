@@ -26,11 +26,14 @@ def scrape_flipkart(query: str, max_results: int = 5) -> list[Product]:
             java_script_enabled=True,
         )
         page = context.new_page()
-        page.set_default_timeout(25000)
+        page.set_default_timeout(10000)
+
+        # Block images, fonts, media, and stylesheets to make page load ultra fast (2s)
+        page.route("**/*.{png,jpg,jpeg,webp,gif,svg,css,woff,woff2,ttf,otf}", lambda route: route.abort())
 
         try:
-            page.goto(url, timeout=30000)
-            page.wait_for_selector('div[data-id]', timeout=10000)
+            page.goto(url, wait_until="domcontentloaded", timeout=12000)
+            page.wait_for_selector('div[data-id]', timeout=6000)
 
             product_cards = page.query_selector_all('div[data-id]')
 

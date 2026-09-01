@@ -77,19 +77,41 @@ async def search_products(q: str):
     # Track search query in MongoDB Atlas for scheduled background refresh
     asyncio.create_task(save_tracked_query(q_lower))
 
-    # Return from cache if available
+    # 1. Return from in-memory cache if available (instant: 0.05s)
     if q_lower in search_cache:
         print(f"Returning cached results for: {q_lower}")
         return search_cache[q_lower]
 
+    # 2. Check MongoDB Atlas for instant database results (< 0.3s)
+    db_products = await search_db_products(q_lower)
+    if db_products and len(db_products) >= 2:
+        print(f"Returning {len(db_products)} instant DB results for: {q_lower}")
+        search_cache[q_lower] = db_products
+        # Trigger background live scrape to refresh DB silently
+        async def _background_refresh():
+            loop = asyncio.get_event_loop()
+            res = await asyncio.gather(
+                loop.run_in_executor(executor, partial(scrape_amazon, q_lower, 5)),
+                loop.run_in_executor(executor, partial(scrape_flipkart, q_lower, 5)),
+                loop.run_in_executor(executor, partial(scrape_meesho, q_lower, 5)),
+                return_exceptions=True
+            )
+            fresh = []
+            for r in res:
+                if isinstance(r, list): fresh.extend(r)
+            if fresh:
+                await upsert_products(fresh)
+        asyncio.create_task(_background_refresh())
+        return db_products
+
+    # 3. If new query not in DB, run fast parallel live scrapers (2-4s)
     print(f"Scraping new results for: {q_lower}")
     loop = asyncio.get_event_loop()
 
-    # Run all 3 scrapers in parallel with a 55-second timeout each
     results = await asyncio.gather(
-        loop.run_in_executor(executor, partial(scrape_amazon, q_lower, 6)),
-        loop.run_in_executor(executor, partial(scrape_flipkart, q_lower, 6)),
-        loop.run_in_executor(executor, partial(scrape_meesho, q_lower, 6)),
+        loop.run_in_executor(executor, partial(scrape_amazon, q_lower, 5)),
+        loop.run_in_executor(executor, partial(scrape_flipkart, q_lower, 5)),
+        loop.run_in_executor(executor, partial(scrape_meesho, q_lower, 5)),
         return_exceptions=True
     )
 
@@ -107,13 +129,13 @@ async def search_products(q: str):
         and len(p.title) > 3
     ]
 
-    # Save fresh products & price points into MongoDB Atlas in background
+    # Save fresh products into MongoDB Atlas in background
     if all_products:
         asyncio.create_task(upsert_products(all_products))
+        search_cache[q_lower] = all_products
     else:
-        # Fallback: if scrapers hit anti-bot or returned empty, load matching stored products from MongoDB
-        print(f"Scrapers returned 0 items. Fetching database fallback for: {q_lower}")
-        all_products = await search_db_products(q_lower)
+        # Fallback to DB
+        all_products = db_products
 
     # Categorize: "exact" vs "related" (demoting accessories)
     query_words = [w for w in q_lower.split() if len(w) > 2]

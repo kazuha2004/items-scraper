@@ -24,12 +24,15 @@ def scrape_meesho(query: str, max_results: int = 5) -> list[Product]:
             viewport={"width": 1280, "height": 800},
         )
         page = context.new_page()
-        page.set_default_timeout(25000)
+        page.set_default_timeout(10000)
+
+        # Block images, fonts, media, and stylesheets to make page load ultra fast (2s)
+        page.route("**/*.{png,jpg,jpeg,webp,gif,svg,css,woff,woff2,ttf,otf}", lambda route: route.abort())
 
         try:
-            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            page.goto(url, wait_until="domcontentloaded", timeout=12000)
             # Give the SPA time to render the product grid
-            page.wait_for_timeout(4000)
+            page.wait_for_timeout(1500)
 
             # Use JS to extract all product cards generically —
             # find anchor tags that look like product links (contain /p/ or go to a product page)
