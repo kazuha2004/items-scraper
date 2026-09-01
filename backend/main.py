@@ -30,8 +30,8 @@ from database import (
 )
 from scheduler import start_scheduler, stop_scheduler, run_price_tracking_cycle
 
-# Thread pool: 1 worker to ensure memory stays within Render 512MB limit
-executor = ThreadPoolExecutor(max_workers=1)
+# Thread pool: 3 workers run scrapers in parallel
+executor = ThreadPoolExecutor(max_workers=3)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -84,16 +84,20 @@ async def search_products(q: str):
     print(f"Scraping new results for: {q_lower}")
     loop = asyncio.get_event_loop()
 
-    # Run scrapers one by one to keep memory footprint under 200MB (Render free tier limit is 512MB)
-    all_products = []
-    for scraper_fn in [scrape_amazon, scrape_flipkart, scrape_meesho]:
-        try:
-            platform_results = await loop.run_in_executor(executor, partial(scraper_fn, q_lower, 8))
-            if platform_results and isinstance(platform_results, list):
-                all_products.extend(platform_results)
-        except Exception as err:
-            print(f"Scraper error on {scraper_fn.__name__}: {err}")
+    # Run all 3 scrapers in parallel with a 55-second timeout each
+    results = await asyncio.gather(
+        loop.run_in_executor(executor, partial(scrape_amazon, q_lower, 6)),
+        loop.run_in_executor(executor, partial(scrape_flipkart, q_lower, 6)),
+        loop.run_in_executor(executor, partial(scrape_meesho, q_lower, 6)),
+        return_exceptions=True
+    )
 
+    all_products = []
+    for platform_results in results:
+        if isinstance(platform_results, Exception):
+            print(f"Scraper error: {platform_results}")
+        elif platform_results:
+            all_products.extend(platform_results)
 
     # Remove junk titles
     all_products = [

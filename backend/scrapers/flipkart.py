@@ -12,13 +12,21 @@ def scrape_flipkart(query: str, max_results: int = 5) -> list[Product]:
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+            args=[
+                "--no-sandbox", "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage", "--disable-gpu",
+                "--disable-extensions", "--disable-background-networking",
+                "--disable-sync", "--no-first-run", "--mute-audio",
+                "--disable-default-apps", "--single-process"
+            ]
         )
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 800}
+            viewport={"width": 1280, "height": 800},
+            java_script_enabled=True,
         )
         page = context.new_page()
+        page.set_default_timeout(25000)
 
         try:
             page.goto(url, timeout=30000)
