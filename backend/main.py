@@ -30,8 +30,8 @@ from database import (
 )
 from scheduler import start_scheduler, stop_scheduler, run_price_tracking_cycle
 
-# Thread pool to run synchronous Playwright scrapers without blocking the event loop
-executor = ThreadPoolExecutor(max_workers=3)
+# Thread pool: 1 worker to ensure memory stays within Render 512MB limit
+executor = ThreadPoolExecutor(max_workers=1)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -62,14 +62,11 @@ app.add_middleware(
 # In-memory cache: max 100 queries, TTL of 3 hours (10800 seconds)
 search_cache = TTLCache(maxsize=100, ttl=10800)
 
-@app.get("/api/debug/scrape")
-async def debug_scrape(q: str = "iphone 15"):
-    loop = asyncio.get_event_loop()
-    amazon_res = await loop.run_in_executor(executor, partial(scrape_amazon, q, 3))
+@app.get("/")
+def read_root():
     return {
-        "query": q,
-        "amazon_count": len(amazon_res),
-        "amazon_first": amazon_res[0].model_dump() if amazon_res else None
+        "message": "Welcome to the DealHunter Product Comparison API with MongoDB Atlas Price Tracking",
+        "endpoints": ["/api/search", "/api/product/history", "/api/alerts"]
     }
 
 @app.get("/api/search", response_model=List[Product])
@@ -87,20 +84,16 @@ async def search_products(q: str):
     print(f"Scraping new results for: {q_lower}")
     loop = asyncio.get_event_loop()
 
-    # Fetch 15 results per platform so we have enough for both sections
-    results = await asyncio.gather(
-        loop.run_in_executor(executor, partial(scrape_meesho, q_lower, 15)),
-        loop.run_in_executor(executor, partial(scrape_amazon, q_lower, 15)),
-        loop.run_in_executor(executor, partial(scrape_flipkart, q_lower, 15)),
-        return_exceptions=True
-    )
-
+    # Run scrapers one by one to keep memory footprint under 200MB (Render free tier limit is 512MB)
     all_products = []
-    for platform_results in results:
-        if isinstance(platform_results, Exception):
-            print(f"Scraping error: {platform_results}")
-        else:
-            all_products.extend(platform_results)
+    for scraper_fn in [scrape_amazon, scrape_flipkart, scrape_meesho]:
+        try:
+            platform_results = await loop.run_in_executor(executor, partial(scraper_fn, q_lower, 8))
+            if platform_results and isinstance(platform_results, list):
+                all_products.extend(platform_results)
+        except Exception as err:
+            print(f"Scraper error on {scraper_fn.__name__}: {err}")
+
 
     # Remove junk titles
     all_products = [
