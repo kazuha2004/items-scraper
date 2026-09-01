@@ -31,7 +31,12 @@ def scrape_flipkart(query: str, max_results: int = 5) -> list[Product]:
 
         try:
             page.goto(url, timeout=30000)
-            page.wait_for_selector('div[data-id]', timeout=10000)
+            try:
+                page.wait_for_selector('div[data-id]', timeout=10000)
+            except Exception as e:
+                print(f"[Flipkart] Timeout waiting for selector: {e}")
+                # Wait a bit longer just in case
+                page.wait_for_timeout(5000)
 
             product_cards = page.query_selector_all('div[data-id]')
 
