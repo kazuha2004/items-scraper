@@ -63,12 +63,16 @@ app.add_middleware(
 # In-memory cache: max 100 queries, TTL of 3 hours (10800 seconds)
 search_cache = TTLCache(maxsize=100, ttl=10800)
 
-@app.get("/")
-def read_root():
-    return {
-        "message": "Welcome to the DealHunter Product Comparison API with MongoDB Atlas Price Tracking",
-        "endpoints": ["/api/search", "/api/product/history", "/api/alerts"]
-    }
+@app.get("/api/test-scrape")
+async def test_scrape(site: str = "amazon", q: str = "paint color"):
+    import traceback
+    fn = scrape_amazon if site == "amazon" else (scrape_flipkart if site == "flipkart" else scrape_meesho)
+    try:
+        loop = asyncio.get_event_loop()
+        res = await loop.run_in_executor(executor, partial(fn, q, 3))
+        return {"site": site, "count": len(res), "items": [p.model_dump() for p in res]}
+    except Exception as e:
+        return {"site": site, "error": str(e), "traceback": traceback.format_exc()}
 
 @app.get("/api/search", response_model=List[Product])
 async def search_products(q: str):
