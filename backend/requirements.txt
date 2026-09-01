@@ -1,0 +1,11 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+playwright>=1.47.0
+pydantic>=2.9.0
+email-validator>=2.2.0
+cachetools>=5.5.0
+motor>=3.6.0
+pymongo>=4.9.0
+apscheduler>=3.10.4
+python-dotenv>=1.0.1
+dnspython>=2.6.1
