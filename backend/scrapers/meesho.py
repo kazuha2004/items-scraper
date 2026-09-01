@@ -9,7 +9,10 @@ def scrape_meesho(query: str, max_results: int = 5) -> list[Product]:
     url = f"https://www.meesho.com/search?q={encoded_query}"
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+        )
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             viewport={"width": 1280, "height": 800},
