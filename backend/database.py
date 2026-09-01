@@ -269,3 +269,31 @@ async def evaluate_pending_alerts() -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"Error evaluating alerts: {e}")
     return triggered
+
+async def search_db_products(query: str, limit: int = 30) -> List[Product]:
+    """Search stored MongoDB products by query keywords as a fast database fallback."""
+    if not is_connected or db is None:
+        return []
+    try:
+        words = [w for w in query.strip().split() if len(w) >= 2]
+        if not words:
+            return []
+        regex_pattern = "|".join([re.escape(w) for w in words[:3]])
+        cursor = db.products.find({"title": {"$regex": regex_pattern, "$options": "i"}}).limit(limit)
+        products = []
+        async for doc in cursor:
+            products.append(Product(
+                platform=doc.get("platform", "E-Commerce"),
+                title=doc.get("title", ""),
+                price=doc.get("price", 0.0),
+                rating=doc.get("rating"),
+                review_count=doc.get("review_count", 0),
+                availability=doc.get("availability", True),
+                image_url=doc.get("image_url", ""),
+                product_url=doc.get("product_url", "")
+            ))
+        return products
+    except Exception as e:
+        print(f"Error searching DB products: {e}")
+        return []
+

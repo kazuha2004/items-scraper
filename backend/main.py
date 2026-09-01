@@ -26,7 +26,8 @@ from database import (
     upsert_products,
     save_tracked_query,
     get_product_history,
-    create_price_alert
+    create_price_alert,
+    search_db_products
 )
 from scheduler import start_scheduler, stop_scheduler, run_price_tracking_cycle
 
@@ -109,6 +110,10 @@ async def search_products(q: str):
     # Save fresh products & price points into MongoDB Atlas in background
     if all_products:
         asyncio.create_task(upsert_products(all_products))
+    else:
+        # Fallback: if scrapers hit anti-bot or returned empty, load matching stored products from MongoDB
+        print(f"Scrapers returned 0 items. Fetching database fallback for: {q_lower}")
+        all_products = await search_db_products(q_lower)
 
     # Categorize: "exact" vs "related" (demoting accessories)
     query_words = [w for w in q_lower.split() if len(w) > 2]

@@ -17,7 +17,7 @@ def scrape_flipkart(query: str, max_results: int = 5) -> list[Product]:
                 "--disable-dev-shm-usage", "--disable-gpu",
                 "--disable-extensions", "--disable-background-networking",
                 "--disable-sync", "--no-first-run", "--mute-audio",
-                "--disable-default-apps", "--single-process"
+                "--disable-default-apps"
             ]
         )
         context = browser.new_context(
