@@ -11,27 +11,18 @@ def scrape_meesho(query: str, max_results: int = 5) -> list[Product]:
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
-            args=[
-                "--no-sandbox", "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage", "--disable-gpu",
-                "--disable-extensions", "--disable-background-networking",
-                "--disable-sync", "--no-first-run", "--mute-audio",
-                "--disable-default-apps"
-            ]
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
         )
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             viewport={"width": 1280, "height": 800},
         )
         page = context.new_page()
-        page.set_default_timeout(15000)
-
-        # Block heavy images and web fonts only (keep CSS so layout selectors work)
-        page.route("**/*.{png,jpg,jpeg,webp,gif,svg,woff,woff2,ttf,otf}", lambda route: route.abort())
 
         try:
-            page.goto(url, wait_until="domcontentloaded", timeout=15000)
-            page.wait_for_timeout(2500)
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            # Give the SPA time to render the product grid
+            page.wait_for_timeout(3500)
 
             # Use JS to extract all product cards generically —
             # find anchor tags that look like product links (contain /p/ or go to a product page)
