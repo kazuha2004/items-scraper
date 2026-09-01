@@ -62,11 +62,14 @@ app.add_middleware(
 # In-memory cache: max 100 queries, TTL of 3 hours (10800 seconds)
 search_cache = TTLCache(maxsize=100, ttl=10800)
 
-@app.get("/")
-def read_root():
+@app.get("/api/debug/scrape")
+async def debug_scrape(q: str = "iphone 15"):
+    loop = asyncio.get_event_loop()
+    amazon_res = await loop.run_in_executor(executor, partial(scrape_amazon, q, 3))
     return {
-        "message": "Welcome to the DealHunter Product Comparison API with MongoDB Atlas Price Tracking",
-        "endpoints": ["/api/search", "/api/product/history", "/api/alerts", "/api/scheduler/trigger"]
+        "query": q,
+        "amazon_count": len(amazon_res),
+        "amazon_first": amazon_res[0].model_dump() if amazon_res else None
     }
 
 @app.get("/api/search", response_model=List[Product])
