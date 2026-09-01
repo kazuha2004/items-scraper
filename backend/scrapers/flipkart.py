@@ -47,7 +47,7 @@ def scrape_flipkart(query: str, max_results: int = 5) -> list[Product]:
                         for (const el of allDivs) {
                             if (el.children.length === 0) {
                                 const text = (el.innerText || '').trim();
-                                if (text.length > longest.length && !text.includes('₹') && !/^[0-5](\.[0-9])?$/.test(text) && !text.toLowerCase().includes('off')) {
+                                if (text.length > longest.length && !text.includes('₹') && !/^[0-5](\\.[0-9])?$/.test(text) && !text.toLowerCase().includes('off')) {
                                     longest = text;
                                 }
                             }
@@ -81,7 +81,7 @@ def scrape_flipkart(query: str, max_results: int = 5) -> list[Product]:
 
                     # Rating — look for a short decimal number in a small element
                     rating = None
-                    rating_text = page.evaluate("""(card) => {
+                    rating_text = page.evaluate(r"""(card) => {
                         const spans = card.querySelectorAll('div, span');
                         for (const el of spans) {
                             const t = el.innerText?.trim();
