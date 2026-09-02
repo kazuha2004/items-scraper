@@ -75,7 +75,7 @@ async def test_scrape(site: str = "amazon", q: str = "paint color"):
     import traceback
     fn = scrape_amazon if site == "amazon" else (scrape_flipkart if site == "flipkart" else scrape_meesho)
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         res = await loop.run_in_executor(executor, partial(fn, q, 3))
         return {"site": site, "count": len(res), "items": [p.model_dump() for p in res]}
     except Exception as e:
@@ -100,7 +100,7 @@ async def search_products(q: str):
         search_cache[q_lower] = db_products
         # Trigger background live scrape to refresh DB silently
         async def _background_refresh():
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             res = await asyncio.gather(
                 loop.run_in_executor(executor, partial(scrape_amazon, q_lower, 5)),
                 loop.run_in_executor(executor, partial(scrape_flipkart, q_lower, 5)),
@@ -117,7 +117,7 @@ async def search_products(q: str):
 
     # 3. If new query not in DB, run fast parallel live scrapers (2-4s)
     print(f"Scraping new results for: {q_lower}")
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     results = await asyncio.gather(
         loop.run_in_executor(executor, partial(scrape_amazon, q_lower, 5)),

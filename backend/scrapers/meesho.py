@@ -70,17 +70,32 @@ def scrape_meesho(query: str, max_results: int = 5) -> list[Product]:
                         const ratingEl = Array.from(a.querySelectorAll('span, div')).find(el => {{
                             const t = (el.childNodes.length === 1 && el.childNodes[0].nodeType === 3)
                                 ? el.childNodes[0].textContent.trim() : '';
-                            return /^[1-5](\.[0-9])?$/.test(t);
+                            return /^[1-5](\\.[0-9])?$/.test(t);
                         }});
                         const rating = ratingEl ? parseFloat(ratingEl.innerText) : null;
 
+                        // Review count: look for patterns like "1.2k Ratings" or "234 Reviews"
+                        let reviewCount = null;
+                        const allSpans = Array.from(a.querySelectorAll('span, p'));
+                        for (const el of allSpans) {{
+                            const t = el.innerText?.trim() || '';
+                            const m = t.match(/^([\\d.]+)k?\\s*(Ratings?|Reviews?)/i);
+                            if (m) {{
+                                let n = parseFloat(m[1]);
+                                if (t.toLowerCase().includes('k')) n = Math.round(n * 1000);
+                                reviewCount = Math.round(n);
+                                break;
+                            }}
+                        }}
+
                         if (title && title.length > 3) {{
-                            results.push({{ title, price: parseFloat(priceText) || 0, imageUrl, productUrl, rating }});
+                            results.push({{ title, price: parseFloat(priceText) || 0, imageUrl, productUrl, rating, reviewCount }});
                         }}
                     }} catch(e) {{}}
                 }}
                 return results;
             }}""")
+
 
             for item in products_data:
                 results.append(Product(
@@ -88,7 +103,7 @@ def scrape_meesho(query: str, max_results: int = 5) -> list[Product]:
                     title=item["title"],
                     price=item["price"],
                     rating=item.get("rating"),
-                    review_count=None,
+                    review_count=item.get("reviewCount"),
                     availability=True,
                     image_url=item["imageUrl"] or "",
                     product_url=item["productUrl"],

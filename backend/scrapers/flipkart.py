@@ -1,4 +1,3 @@
-import re
 import urllib.parse
 # pyrefly: ignore [missing-import]
 from playwright.sync_api import sync_playwright
@@ -94,8 +93,8 @@ def scrape_flipkart(query: str, max_results: int = 5) -> list[Product]:
                     if price_text:
                         try:
                             price = float(price_text.replace("₹", "").replace(",", "").strip())
-                        except:
-                            pass
+                        except (ValueError, TypeError) as e:
+                            print(f"[Flipkart] Could not parse price: {e}")
 
                     # Rating — look for a short decimal number in a small element
                     rating = None
@@ -112,21 +111,27 @@ def scrape_flipkart(query: str, max_results: int = 5) -> list[Product]:
                     if rating_text:
                         try:
                             rating = float(rating_text)
-                        except:
-                            pass
+                        except (ValueError, TypeError) as e:
+                            print(f"[Flipkart] Could not parse rating: {e}")
 
-                    # Reviews
+                    # Reviews — JS-based extraction (resilient to Flipkart class name changes)
                     reviews = 0
-                    reviews_elem = card.query_selector('span[class*="_2_R_DZ"]')
-                    if not reviews_elem:
-                        reviews_elem = card.query_selector('span[class*="Wphh3N"]')
-                    if reviews_elem:
-                        match = re.search(r'([\d,]+)', reviews_elem.inner_text())
-                        if match:
-                            try:
-                                reviews = int(match.group(1).replace(",", ""))
-                            except:
-                                pass
+                    reviews_text = page.evaluate(r"""(card) => {
+                        const els = card.querySelectorAll('span');
+                        for (const el of els) {
+                            const t = el.innerText?.trim() || '';
+                            // Match patterns like "1,234 Ratings" or "(1,234)"
+                            const m = t.match(/^[\(]?([\d,]+)[\)]?\s*(Ratings?|Reviews?|ratings?|reviews?)/i)
+                                   || t.match(/^\(([\d,]+)\)$/);
+                            if (m) return m[1].replace(/,/g, '');
+                        }
+                        return null;
+                    }""", card)
+                    if reviews_text:
+                        try:
+                            reviews = int(reviews_text)
+                        except (ValueError, TypeError) as e:
+                            print(f"[Flipkart] Could not parse review count: {e}")
 
                     image_url = img_elem.get_attribute('src') if img_elem else ""
 

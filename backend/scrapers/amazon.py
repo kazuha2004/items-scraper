@@ -83,8 +83,8 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
                     if price_elem:
                         try:
                             price = float(price_elem.inner_text().replace(",", "").strip().rstrip('.'))
-                        except:
-                            pass
+                        except (ValueError, TypeError) as e:
+                            print(f"[Amazon] Could not parse price: {e}")
 
                     # Rating
                     rating = None
@@ -94,8 +94,8 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
                     if rating_elem:
                         try:
                             rating = float(rating_elem.inner_text().split(" out")[0])
-                        except:
-                            pass
+                        except (ValueError, TypeError) as e:
+                            print(f"[Amazon] Could not parse rating: {e}")
 
                     # Reviews count
                     reviews = 0
@@ -106,8 +106,8 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
                         try:
                             label = reviews_elem.get_attribute('aria-label') or reviews_elem.inner_text()
                             reviews = int(label.replace(",", "").split(" ")[0].strip())
-                        except:
-                            pass
+                        except (ValueError, TypeError) as e:
+                            print(f"[Amazon] Could not parse review count: {e}")
 
                     img_elem = card.query_selector('img.s-image')
                     image_url = img_elem.get_attribute('src') if img_elem else ""
