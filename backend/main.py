@@ -47,14 +47,19 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Product Comparison API", lifespan=lifespan)
 
 # Allow requests from the Next.js frontend (local and deployed on Vercel)
-frontend_url = os.getenv("FRONTEND_URL", "")
-allowed_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+frontend_url = os.getenv("FRONTEND_URL", "").strip()
+allowed_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
 if frontend_url:
     allowed_origins.append(frontend_url)
 
+# NOTE: allow_credentials=True is incompatible with allow_origins=["*"] per CORS spec.
+# We always use an explicit origins list instead.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if frontend_url else ["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
