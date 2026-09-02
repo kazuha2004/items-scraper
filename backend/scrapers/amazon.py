@@ -11,37 +11,57 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--disable-blink-features=AutomationControlled"]
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--disable-blink-features=AutomationControlled",
+                "--window-size=1366,768",
+            ]
         )
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
             viewport={"width": 1366, "height": 768},
             locale="en-IN",
             timezone_id="Asia/Kolkata",
             extra_http_headers={
                 "Accept-Language": "en-IN,en;q=0.9",
-                "sec-ch-ua": '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "sec-ch-ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
                 "sec-ch-ua-mobile": "?0",
-                "sec-ch-ua-platform": '"Windows"',
+                "sec-ch-ua-platform": '"Linux"',
             }
         )
         page = context.new_page()
-        page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
+        page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+            Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3]});
+            Object.defineProperty(navigator, 'languages', {get: () => ['en-IN', 'en']});
+        """)
 
         try:
-            page.goto(url, timeout=30000)
+            page.goto(url, wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(2000)
+
+            # Detect if Amazon served a CAPTCHA / bot-check page
+            page_title = page.title().lower()
+            page_content = page.content()
+            if "captcha" in page_title or "robot" in page_title or "captcha" in page_content[:3000].lower():
+                print(f"[Amazon] ⚠️ Bot/CAPTCHA page detected. Server IP may be blocked by Amazon.")
+                return results
+
             try:
                 page.wait_for_selector('div[data-component-type="s-search-result"]', timeout=10000)
-            except Exception as e:
-                print(f"[Amazon] Timeout waiting for selector: {e}")
-                # Wait a bit longer just in case
-                page.wait_for_timeout(5000)
+            except Exception:
+                print(f"[Amazon] ⚠️ No product cards found — page may have changed or IP is blocked. Title: '{page.title()}'")
+                page.wait_for_timeout(3000)
 
             product_cards = page.query_selector_all('div[data-component-type="s-search-result"]')
+            print(f"[Amazon] Found {len(product_cards)} product cards")
 
             for card in product_cards[:max_results]:
                 try:
-                    # Title: use JS to find the longest text inside an h2 tag
                     title = page.evaluate("""(card) => {
                         const h2s = card.querySelectorAll('h2');
                         let longest = "";
@@ -52,8 +72,6 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
                             }
                         }
                         if (longest.length > 5) return longest;
-                        
-                        // Fallback: any span with a lot of text that isn't a price
                         const spans = card.querySelectorAll('span');
                         for (const span of spans) {
                             if (span.children.length === 0) {
@@ -64,20 +82,17 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
                         return "";
                     }""", card) or ""
 
-                    # Fallback: get title from img alt tag
                     if not title:
                         img_fallback = card.query_selector('img.s-image')
                         if img_fallback:
                             title = img_fallback.get_attribute('alt') or ""
 
-                    # Product URL
                     url_elem = card.query_selector('h2 a')
                     if not url_elem:
                         url_elem = card.query_selector('a[class*="a-link-normal"][href*="/dp/"]')
                     product_url_path = url_elem.get_attribute("href") if url_elem else ""
                     product_url = f"https://www.amazon.in{product_url_path}" if product_url_path and not product_url_path.startswith('http') else product_url_path
 
-                    # Price — look for the whole price number
                     price = 0.0
                     price_elem = card.query_selector('span.a-price-whole')
                     if price_elem:
@@ -86,7 +101,6 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
                         except (ValueError, TypeError) as e:
                             print(f"[Amazon] Could not parse price: {e}")
 
-                    # Rating
                     rating = None
                     rating_elem = card.query_selector('i[class*="a-icon-star-small"] span.a-icon-alt')
                     if not rating_elem:
@@ -97,7 +111,6 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
                         except (ValueError, TypeError) as e:
                             print(f"[Amazon] Could not parse rating: {e}")
 
-                    # Reviews count
                     reviews = 0
                     reviews_elem = card.query_selector('span[aria-label*="ratings"]')
                     if not reviews_elem:
@@ -112,7 +125,7 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
                     img_elem = card.query_selector('img.s-image')
                     image_url = img_elem.get_attribute('src') if img_elem else ""
 
-                    product = Product(
+                    results.append(Product(
                         platform="Amazon",
                         title=title or "Unknown Product",
                         price=price,
@@ -121,8 +134,7 @@ def scrape_amazon(query: str, max_results: int = 5) -> list[Product]:
                         availability=price > 0,
                         image_url=image_url or "",
                         product_url=product_url
-                    )
-                    results.append(product)
+                    ))
                 except Exception as e:
                     print(f"[Amazon] Error parsing product: {e}")
 
