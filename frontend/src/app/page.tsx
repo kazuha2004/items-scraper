@@ -463,11 +463,27 @@ export default function Home() {
   const filterFn = (p: Product) => filterPlatform === 'All' || p.platform === filterPlatform;
 
   const exact = useMemo(() =>
-    results.filter(p => p.match_type === 'exact').filter(filterFn).sort(sortFn),
+    results
+      .filter(p => p.match_type === 'exact')
+      .filter(p => filterPlatform === 'All' || p.platform === filterPlatform)
+      .sort((a, b) => {
+        if (sortBy === 'price') return (a.price || Infinity) - (b.price || Infinity);
+        if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
+        if (sortBy === 'platform') return a.platform.localeCompare(b.platform);
+        return 0;
+      }),
     [results, sortBy, filterPlatform]
   );
   const related = useMemo(() =>
-    results.filter(p => p.match_type === 'related').filter(filterFn).sort(sortFn),
+    results
+      .filter(p => p.match_type === 'related')
+      .filter(p => filterPlatform === 'All' || p.platform === filterPlatform)
+      .sort((a, b) => {
+        if (sortBy === 'price') return (a.price || Infinity) - (b.price || Infinity);
+        if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
+        if (sortBy === 'platform') return a.platform.localeCompare(b.platform);
+        return 0;
+      }),
     [results, sortBy, filterPlatform]
   );
 
@@ -571,7 +587,7 @@ export default function Home() {
                 <div className="product-grid">
                   {exact.map((p, i) => (
                     <ProductCard
-                      key={i}
+                      key={p.product_url || `${p.platform}-${p.title}`}
                       product={p}
                       idx={i}
                       onOpenHistory={prod => setHistoryModalProduct(prod)}
@@ -595,7 +611,7 @@ export default function Home() {
                 <div className="product-grid">
                   {related.map((p, i) => (
                     <ProductCard
-                      key={i}
+                      key={p.product_url || `${p.platform}-${p.title}`}
                       product={p}
                       idx={i}
                       onOpenHistory={prod => setHistoryModalProduct(prod)}
