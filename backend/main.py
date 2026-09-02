@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Product Comparison API", lifespan=lifespan)
 
 # Allow requests from the Next.js frontend (local and deployed on Vercel)
-frontend_url = os.getenv("FRONTEND_URL", "").strip()
+frontend_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
 allowed_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
