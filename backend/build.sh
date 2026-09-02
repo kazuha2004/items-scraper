@@ -8,5 +8,6 @@ pip install -r requirements.txt
 # Install the Chromium browser
 playwright install chromium
 
-# IMPORTANT: Install the required Linux system dependencies for the browser
-playwright install-deps chromium
+# IMPORTANT: Render native environment does not allow sudo, so we cannot run install-deps.
+# We will rely on Render's OS image having the necessary libraries.
+
