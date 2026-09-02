@@ -70,6 +70,11 @@ def read_root():
         "endpoints": ["/api/search", "/api/product/history", "/api/alerts"]
     }
 
+@app.get("/health")
+def health_check():
+    """Render health check endpoint."""
+    return {"status": "ok"}
+
 @app.get("/api/test-scrape")
 async def test_scrape(site: str = "amazon", q: str = "paint color"):
     import traceback
