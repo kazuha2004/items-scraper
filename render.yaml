@@ -24,4 +24,6 @@ services:
         sync: false          # set manually in Render dashboard
       - key: EMAIL_FROM
         sync: false          # set manually in Render dashboard
+      - key: PYTHON_VERSION
+        value: "3.12.7"
     healthCheckPath: /health
