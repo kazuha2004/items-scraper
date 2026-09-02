@@ -26,4 +26,6 @@ services:
         sync: false          # set manually in Render dashboard
       - key: PYTHON_VERSION
         value: "3.12.7"
+      - key: PLAYWRIGHT_BROWSERS_PATH
+        value: /opt/render/project/.playwright-browsers
     healthCheckPath: /health
